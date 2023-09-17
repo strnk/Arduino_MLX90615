@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <I2cMaster.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -29,10 +28,9 @@
 #define DEVICE_ADDR                     MLX90615_DefaultAddr
 
 class MLX90615 {
-
+	
   protected:
     TwoWire* wbus;
-    I2cMasterBase* bus;
 
     union {
         uint8_t	buffer[5];
@@ -59,15 +57,8 @@ class MLX90615 {
         Parameters: sda pin, scl pin, i2c device address
         Return: null
     ******************************************************************/
-    MLX90615(uint8_t addr, I2cMasterBase* i2c) {
-        dev = addr << 1;
-        bus = i2c;
-        wbus = 0;
-    }
-
     MLX90615(uint8_t addr, TwoWire* i2c) {
         dev = addr << 1;
-        bus = 0;
         wbus = i2c;
     }
 
@@ -165,31 +156,20 @@ class MLX90615 {
                         -10  I2C Connector not specified yet
     */
     int readReg(uint8_t MLXaddr, uint16_t* resultReg) {
-        if (bus && !wbus) {
-            // Using alternative I2C library
-            bus->start(dev | I2C_WRITE);
-            bus->write(MLXaddr);
-            bus->restart(dev | I2C_READ);
-            dataLow = bus->read(false);
-            dataHigh = bus->read(false);
-            *resultReg = (uint16_t)dataHigh << 8 | dataLow;
-            pec = bus->read(true);
-            bus->stop();
-            return 0;
-        } else if (wbus && !bus) {
-            // Using Wire
-            wbus->beginTransmission(i2c_addr);
-            wbus->write(MLXaddr);
-            wbus->endTransmission(false);
-            if (wbus->requestFrom(i2c_addr, (uint8_t)3) == 3) {
-                dataLow = wbus->read();
-                dataHigh = wbus->read();
-                pec = wbus->read();
-                *resultReg = dataHigh << 8 | dataLow;
-                return 0;
-            } else {
-                return -2;
-            }
+        if (wbus) {
+					// Using Wire
+					wbus->beginTransmission(i2c_addr);
+					wbus->write(MLXaddr);
+					wbus->endTransmission(false);
+					if (wbus->requestFrom(i2c_addr, (uint8_t)3) == 3) {
+							dataLow = wbus->read();
+							dataHigh = wbus->read();
+							pec = wbus->read();
+							*resultReg = dataHigh << 8 | dataLow;
+							return 0;
+					} else {
+							return -2;
+					}
         } else {
             return -10;
         }
@@ -238,30 +218,15 @@ class MLX90615 {
         }
 
         int sent = 0;
-        if (bus && !wbus) {
-            // Using alternative I2C library
-            bus->start(dev | I2C_WRITE);
-            for (int i = 1 ; i <= 4  ; i++) {
-                if (bus->write(buffer[i])) {
-                    sent++;
-                } else {
-                    break;
-                }
-            }
-            bus->stop();
-            if (sent != 4) {
-                return -2;
-            }
-            return 0;
-        } else if (wbus && !bus) {
-            // Using Wire
-            wbus->beginTransmission(i2c_addr);
-            sent = wbus->write(&buffer[1], 4);
-            wbus->endTransmission();
-            if (sent != 4) {
-                return -2;
-            }
-            return 0;
+        if (wbus) {
+					// Using Wire
+					wbus->beginTransmission(i2c_addr);
+					sent = wbus->write(&buffer[1], 4);
+					wbus->endTransmission();
+					if (sent != 4) {
+							return -2;
+					}
+					return 0;
         } else {
             return -10;
         }
